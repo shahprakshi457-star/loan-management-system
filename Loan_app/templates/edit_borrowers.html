@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block body %}
+<h2>Edit borrower #{{ b.borrower_id }}</h2>
+<form method="post">
+  <input name="full_name" value="{{ b.full_name }}" required>
+  <input type="date" name="dob" value="{{ b.dob }}" required>
+  <input name="line1" value="{{ b.line1 or '' }}" required>
+  <select name="pincode">{% for a in areas %}
+    <option value="{{ a.pincode }}" {{ 'selected' if a.pincode == b.pincode }}>
+      {{ a.pincode }} – {{ a.city }}</option>{% endfor %}</select>
+  <button>Save</button>
+</form>
+{% for kind, items in [('phone', phones), ('email', emails)] %}
+  <h3>{{ kind|capitalize }}s</h3>
+  <ul>{% for i in items %}<li>{{ i.value }}
+    <form class="inline" method="post"
+          action="{{ url_for('contact_delete', bid=b.borrower_id, kind=kind) }}">
+      <input type="hidden" name="value" value="{{ i.value }}"><button>Remove</button></form></li>
+  {% endfor %}</ul>
+  <form method="post" action="{{ url_for('contact_add', bid=b.borrower_id, kind=kind) }}">
+    <input name="value" placeholder="New {{ kind }}" required><button>Add {{ kind }}</button></form>
+{% endfor %}
+<p><a href="{{ url_for('borrowers') }}">Back</a></p>{% endblock %}
