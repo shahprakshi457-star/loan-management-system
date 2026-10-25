@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block body %}
+<h2>Loan #{{ loan.loan_id }} – {{ loan.borrower }}</h2>
+<p>{{ loan.product }} · {{ loan.branch }} · Officer {{ loan.officer }} · Status <b>{{ loan.status }}</b><br>
+   Principal {{ loan.principal }} at {{ loan.annual_rate_pct }}% for {{ loan.tenure_months }} months
+   {% if outstanding is not none %}· Outstanding principal: <b>{{ outstanding }}</b>{% endif %}</p>
+{% if loan.status == 'APPLIED' %}
+  <form method="post" action="{{ url_for('approve', lid=loan.loan_id) }}"><button>Approve loan</button></form>
+{% endif %}
+<table>
+  <tr><th>#</th><th>Due date</th><th>Principal</th><th>Interest</th><th>Total due</th>
+      <th>Paid</th><th>Status</th><th>Pay</th></tr>
+  {% for r in rows %}<tr>
+    <td>{{ r.seq_no }}</td><td>{{ r.due_date }}</td><td>{{ r.principal_due }}</td>
+    <td>{{ r.interest_due }}</td><td>{{ r.total_due }}</td><td>{{ r.total_paid }}</td>
+    <td>{{ r.status }}</td>
+    <td>{% if r.status != 'PAID' %}
+      <form class="inline" method="post" action="{{ url_for('pay', iid=r.installment_id) }}">
+        <input type="hidden" name="loan_id" value="{{ loan.loan_id }}">
+        <input name="amount" size="9" value="{{ r.total_due - r.total_paid }}">
+        <select name="mode"><option>UPI</option><option>CARD</option>
+          <option>NETBANKING</option><option>CASH</option></select>
+        <input name="ref" size="9" placeholder="Reference">
+        <button>Pay</button></form>{% endif %}</td>
+  </tr>{% endfor %}
+</table>
+<p><a href="{{ url_for('loans') }}">Back to loans</a></p>{% endblock %}
