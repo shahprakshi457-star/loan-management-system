@@ -103,7 +103,7 @@ FOR EACH ROW
 BEGIN
   DECLARE v_min, v_max DECIMAL(14,2);
   DECLARE v_tmin, v_tmax INT;
-  SELECT min_amount, max_amount, min_tenure_months, max_tenure_months
+    SELECT min_amt, max_amt, min_tenure_months, max_tenure_months
     INTO v_min, v_max, v_tmin, v_tmax
     FROM loan_product WHERE product_id = NEW.product_id;
   IF NEW.principal < v_min OR NEW.principal > v_max THEN
