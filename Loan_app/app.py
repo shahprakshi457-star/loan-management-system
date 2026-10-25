@@ -12,7 +12,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-only-key")
 DB = dict(
     host=os.environ.get("DB_HOST", "localhost"),
     user=os.environ.get("DB_USER", "loan_app"),
-    password=os.environ.get("DB_PASSWORD", "change_me"),
+    password=os.environ.get("DB_PASSWORD", "star"),
     database="loan_mang",
 )
 
