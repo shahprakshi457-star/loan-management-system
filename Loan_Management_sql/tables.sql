@@ -1,3 +1,4 @@
+DROP DATABASE IF EXISTS loan_mang;
 CREATE DATABASE loan_mang;
 USE loan_mang;
 
@@ -23,7 +24,7 @@ CREATE TABLE borrower_phone(
 
 CREATE TABLE borrower_email(
 	borrower_id INT NOT NULL,
-	email VARCHAR(15) NOT NULL UNIQUE,
+	email VARCHAR(100) NOT NULL UNIQUE,
 	PRIMARY KEY (borrower_id, email),
 	FOREIGN KEY (borrower_id) REFERENCES borrower(borrower_id) ON DELETE CASCADE
 );
