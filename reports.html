@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% macro show(rows) %}
+  {% if rows %}<table><tr>{% for k in rows[0].keys() %}<th>{{ k }}</th>{% endfor %}</tr>
+    {% for r in rows %}<tr>{% for v in r.values() %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}
+  </table>{% else %}<p>No data.</p>{% endif %}
+{% endmacro %}
+{% block body %}
+<h2>Reports</h2>
+{% for title, rows in sections %}<h3>{{ title }}</h3>{{ show(rows) }}{% endfor %}
+{% endblock %}

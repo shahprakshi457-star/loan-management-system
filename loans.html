@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% block body %}
+<h2>Loans</h2>
+<h3>New loan application</h3>
+<form method="post">
+  <select name="borrower_id">{% for b in borrowers %}
+    <option value="{{ b.borrower_id }}">{{ b.full_name }}</option>{% endfor %}</select>
+  <select name="officer_id">{% for o in officers %}
+    <option value="{{ o.officer_id }}">{{ o.name }}</option>{% endfor %}</select>
+  <select name="branch_id">{% for br in branches %}
+    <option value="{{ br.branch_id }}">{{ br.name }}</option>{% endfor %}</select>
+  <select name="product_id">{% for p in products %}
+    <option value="{{ p.product_id }}">{{ p.name }}</option>{% endfor %}</select>
+  <input name="principal" placeholder="Principal" required>
+  <input name="rate" placeholder="Annual rate %" required>
+  <input name="tenure" placeholder="Months" required>
+  <input type="date" name="start_date" required>
+  <button>Apply</button>
+</form>
+<table>
+  <tr><th>ID</th><th>Borrower</th><th>Officer</th><th>Branch</th><th>Product</th>
+      <th>Principal</th><th>Rate</th><th>Months</th><th>Status</th><th></th></tr>
+  {% for r in rows %}<tr>
+    <td>{{ r.loan_id }}</td><td>{{ r.borrower }}</td><td>{{ r.officer }}</td><td>{{ r.branch }}</td>
+    <td>{{ r.product }}</td><td>{{ r.principal }}</td><td>{{ r.annual_rate_pct }}</td>
+    <td>{{ r.tenure_months }}</td><td>{{ r.status }}</td>
+    <td>{% if r.status == 'APPLIED' %}
+      <form class="inline" method="post" action="{{ url_for('approve', lid=r.loan_id) }}">
+        <button>Approve</button></form>
+      <form class="inline" method="post" action="{{ url_for('delete_loan', lid=r.loan_id) }}"
+            onsubmit="return confirm('Delete this application?')"><button>Delete</button></form>
+    {% else %}<a href="{{ url_for('loan_detail', lid=r.loan_id) }}">EMIs</a>{% endif %}</td>
+  </tr>{% endfor %}
+</table>{% endblock %}
