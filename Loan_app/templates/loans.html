@@ -5,7 +5,7 @@
   <tr><th>Product</th><th>Principal</th><th>Tenure</th></tr>
   {% for p in products %}<tr>
     <td>{{ p.name }}</td>
-    <td>₹{{ p.min_amount|inr }} – ₹{{ p.max_amount|inr }}</td>
+    <td>₹{{ p.min_amt|inr }} – ₹{{ p.max_amt|inr }}</td>
     <td>{{ p.min_tenure_months }} – {{ p.max_tenure_months }} months</td>
   </tr>{% endfor %}
 </table>
