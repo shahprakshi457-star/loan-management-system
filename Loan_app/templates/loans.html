@@ -1,5 +1,14 @@
 {% extends "base.html" %}{% block body %}
 <h2>Loans</h2>
+<h3>Loan limits</h3>
+<table style="width:auto">
+  <tr><th>Product</th><th>Principal</th><th>Tenure</th></tr>
+  {% for p in products %}<tr>
+    <td>{{ p.name }}</td>
+    <td>₹{{ p.min_amount|inr }} – ₹{{ p.max_amount|inr }}</td>
+    <td>{{ p.min_tenure_months }} – {{ p.max_tenure_months }} months</td>
+  </tr>{% endfor %}
+</table>
 <h3>New loan application</h3>
 <form method="post">
   <select name="borrower_id">{% for b in borrowers %}
