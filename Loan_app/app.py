@@ -16,6 +16,22 @@ DB = dict(
     database="loan_mang",
 )
 
+@app.template_filter("inr")
+def inr(value):
+    """Format a number the Indian way: 1000000 -> 10,00,000."""
+    n = int(value)
+    s = str(abs(n))
+    if len(s) > 3:
+        head, tail = s[:-3], s[-3:]
+        parts = []
+        while len(head) > 2:
+            parts.insert(0, head[-2:])
+            head = head[:-2]
+        if head:
+            parts.insert(0, head)
+        s = ",".join(parts) + "," + tail
+    return ("-" if n < 0 else "") + s
+
 # ------------------------------------------------------------------ DB helpers
 def connect():
     return mysql.connector.connect(**DB)
