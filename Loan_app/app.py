@@ -327,7 +327,7 @@ def reports():
                    COALESCE(SUM(l.principal), 0) AS total_principal
             FROM officer o LEFT JOIN loan l ON l.officer_id = o.officer_id
             GROUP BY o.officer_id, o.name""")),
-        ("Allowed officer / branch / product combinations (5NF join)", query("""
+        ("Allowed officer / branch / product combinations", query("""
             SELECT o.name AS officer, br.name AS branch, p.name AS product
             FROM officer_branch ob
             JOIN branch_product bp  ON bp.branch_id = ob.branch_id
