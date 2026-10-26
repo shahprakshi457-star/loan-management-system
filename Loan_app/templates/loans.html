@@ -31,7 +31,7 @@
   {% for r in rows %}<tr>
     <td>{{ r.loan_id }}</td><td>{{ r.borrower }}</td><td>{{ r.officer }}</td><td>{{ r.branch }}</td>
     <td>{{ r.product }}</td><td>{{ r.principal }}</td><td>{{ r.annual_rate_pct }}</td>
-    <td>{{ r.tenure_months }}</td><td>{{ r.status }}</td>
+    <td>{{ r.tenure_months }}</td><td><span class="badge {{ r.status|lower }}">{{ r.status }}</span></td>
     <td>{% if r.status == 'APPLIED' %}
       <form class="inline" method="post" action="{{ url_for('approve', lid=r.loan_id) }}">
         <button>Approve</button></form>
