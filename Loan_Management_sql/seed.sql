@@ -26,3 +26,4 @@ INSERT INTO borrower_phone VALUES (1,'9876543210'), (1,'9876500001'), (2,'912345
 INSERT INTO borrower_email VALUES (1,'asha@example.com'), (2,'rahul@example.com');
 INSERT INTO borrower_address (borrower_id, line1, pincode) VALUES
  (1,'12 Anna Nagar','600001'), (2,'45 KK Nagar','625001');
+ 
