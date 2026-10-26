@@ -1,0 +1,143 @@
+:root {
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --border: #e5e7eb;
+  --danger: #dc2626;
+  --danger-dark: #b91c1c;
+  --success: #16a34a;
+  --success-dark: #15803d;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 1.25rem; }
+
+/* ---------- Header and navigation ---------- */
+.site-header {
+  background: linear-gradient(90deg, #312e81, #4f46e5);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(49, 46, 129, .3);
+}
+.site-header .wrap {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; min-height: 62px;
+}
+.brand { font-weight: 700; font-size: 1.15rem; letter-spacing: .2px; }
+.brand::before {
+  content: ""; display: inline-block; width: .7rem; height: .7rem;
+  background: #fbbf24; border-radius: 50%; margin-right: .55rem;
+}
+nav a {
+  color: #e0e7ff; text-decoration: none; font-weight: 600;
+  padding: .45rem .95rem; border-radius: 999px; margin-left: .25rem;
+  transition: background .15s;
+}
+nav a:hover { background: rgba(255, 255, 255, .15); color: #fff; }
+nav a.active { background: #fff; color: var(--primary); }
+
+main { padding-top: 1.5rem; padding-bottom: 2rem; }
+h2 { margin: .2rem 0 1rem; font-size: 1.6rem; }
+h3 {
+  margin: 1.5rem 0 .5rem; font-size: .85rem; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+a { color: var(--primary); }
+
+/* ---------- Flash messages ---------- */
+.msg {
+  background: #eef2ff; border-left: 4px solid var(--primary);
+  padding: .7rem 1rem; border-radius: 8px; margin: 0 0 .6rem;
+  animation: fadein .3s ease;
+}
+@keyframes fadein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Forms (top-level forms become cards) ---------- */
+main > form {
+  display: flex; flex-wrap: wrap; gap: .6rem; align-items: center;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1rem; margin: .5rem 0 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+}
+input, select {
+  padding: .55rem .7rem; border: 1px solid #d1d5db; border-radius: 8px;
+  font: inherit; background: #fff; min-width: 0;
+}
+input:focus, select:focus {
+  outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, .18);
+}
+button {
+  background: var(--primary); color: #fff; border: none; border-radius: 8px;
+  padding: .55rem 1.1rem; font: inherit; font-weight: 600; cursor: pointer;
+  transition: background .15s, transform .05s;
+}
+button:hover { background: var(--primary-dark); }
+button:active { transform: translateY(1px); }
+
+form[action$="/delete"] button { background: var(--danger); }
+form[action$="/delete"] button:hover { background: var(--danger-dark); }
+form[action$="/approve"] button,
+form[action$="/pay"] button { background: var(--success); }
+form[action$="/approve"] button:hover,
+form[action$="/pay"] button:hover { background: var(--success-dark); }
+
+form.inline { display: inline-flex; align-items: center; gap: .3rem; margin: 0; }
+
+/* ---------- Tables ---------- */
+table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  margin: .5rem 0 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+}
+th {
+  background: #eef2ff; color: #3730a3; text-align: left; font-size: .78rem;
+  text-transform: uppercase; letter-spacing: .05em;
+}
+th, td { padding: .65rem .85rem; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f9fafb; }
+td button { padding: .3rem .7rem; font-size: .85rem; }
+td input, td select { padding: .3rem .45rem; font-size: .9rem; }
+td a { font-weight: 600; text-decoration: none; margin-right: .5rem; }
+td a:hover { text-decoration: underline; }
+
+ul { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+     padding: .6rem 1rem .6rem 2rem; }
+li { padding: .25rem 0; }
+
+/* ---------- Status badges ---------- */
+.badge {
+  display: inline-block; padding: .15rem .65rem; border-radius: 999px;
+  font-size: .75rem; font-weight: 700; letter-spacing: .03em;
+}
+.badge.applied   { background: #fef3c7; color: #92400e; }
+.badge.active    { background: #dbeafe; color: #1e40af; }
+.badge.closed    { background: #e5e7eb; color: #374151; }
+.badge.defaulted,
+.badge.overdue   { background: #fee2e2; color: #991b1b; }
+.badge.paid      { background: #dcfce7; color: #166534; }
+.badge.pending   { background: #f3f4f6; color: #374151; }
+
+/* ---------- Footer ---------- */
+footer { color: var(--muted); font-size: .85rem; text-align: center; padding: 1rem 0 2rem; }
+
+/* ---------- Small screens ---------- */
+@media (max-width: 700px) {
+  .site-header .wrap { flex-direction: column; padding-top: .8rem; padding-bottom: .8rem; }
+  main > form input, main > form select { flex: 1 1 140px; }
+  table { display: block; overflow-x: auto; }
+}

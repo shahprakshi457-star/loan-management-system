@@ -1,5 +1,14 @@
 {% extends "base.html" %}{% block body %}
 <h2>Loans</h2>
+<h3>Loan limits</h3>
+<table style="width:auto">
+  <tr><th>Product</th><th>Principal</th><th>Tenure</th></tr>
+  {% for p in products %}<tr>
+    <td>{{ p.name }}</td>
+    <td>₹{{ p.min_amt|inr }} – ₹{{ p.max_amt|inr }}</td>
+    <td>{{ p.min_tenure_months }} – {{ p.max_tenure_months }} months</td>
+  </tr>{% endfor %}
+</table>
 <h3>New loan application</h3>
 <form method="post">
   <select name="borrower_id">{% for b in borrowers %}
@@ -22,7 +31,7 @@
   {% for r in rows %}<tr>
     <td>{{ r.loan_id }}</td><td>{{ r.borrower }}</td><td>{{ r.officer }}</td><td>{{ r.branch }}</td>
     <td>{{ r.product }}</td><td>{{ r.principal }}</td><td>{{ r.annual_rate_pct }}</td>
-    <td>{{ r.tenure_months }}</td><td>{{ r.status }}</td>
+    <td>{{ r.tenure_months }}</td><td><span class="badge {{ r.status|lower }}">{{ r.status }}</span></td>
     <td>{% if r.status == 'APPLIED' %}
       <form class="inline" method="post" action="{{ url_for('approve', lid=r.loan_id) }}">
         <button>Approve</button></form>
