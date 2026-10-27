@@ -1,19 +1,162 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Loan Management System</title>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loan Management System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  body{font-family:system-ui,sans-serif;max-width:1050px;margin:0 auto;padding:1rem}
-  nav a{margin-right:1.2rem;font-weight:600}
-  table{border-collapse:collapse;width:100%;margin:1rem 0}
-  th,td{border:1px solid #ccc;padding:.4rem .6rem;text-align:left}
-  th{background:#f2f2f2}
-  input,select,button{padding:.35rem;margin:.15rem}
-  .msg{background:#eef2ff;border-left:4px solid #4f46e5;padding:.5rem .8rem;margin:.4rem 0}
-  form.inline{display:inline}
-</style></head><body>
-<h1>Loan Management System</h1>
-<nav><a href="{{ url_for('borrowers') }}">Borrowers</a>
-     <a href="{{ url_for('loans') }}">Loans</a>
-     <a href="{{ url_for('reports') }}">Reports</a></nav><hr>
+  :root{
+    --ink:#10302c;          /* sidebar + headings */
+    --ink-2:#1b4640;
+    --paper:#f2f4f2;        /* page background */
+    --card:#ffffff;
+    --line:#dde3df;
+    --text:#1d2b28;
+    --muted:#6a7a76;
+    --saffron:#d98a1f;      /* primary action */
+    --saffron-d:#b97213;
+    --ok:#1f7a54;  --ok-bg:#dff3e8;
+    --warn:#a8650a; --warn-bg:#fdeccf;
+    --bad:#b3362b; --bad-bg:#fbe1de;
+    --info:#2c5f8a; --info-bg:#dfeaf5;
+    --idle:#55635f; --idle-bg:#e6ebe8;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:'Manrope',system-ui,sans-serif; color:var(--text);
+    background:var(--paper); display:flex; min-height:100vh; line-height:1.5;
+  }
+
+  /* ---------- sidebar ---------- */
+  .side{
+    width:230px; flex-shrink:0; background:var(--ink); color:#fff;
+    padding:1.6rem 1.1rem; position:sticky; top:0; height:100vh;
+    display:flex; flex-direction:column; gap:2rem;
+  }
+  .brand{font-size:1.15rem; font-weight:800; letter-spacing:-.01em; line-height:1.2; padding:0 .5rem}
+  .brand small{display:block; font-weight:500; font-size:.78rem; color:#9db8b2; margin-top:.2rem}
+  .side nav{display:flex; flex-direction:column; gap:.25rem}
+  .side nav a{
+    color:#cfe0dc; text-decoration:none; font-weight:600; font-size:.95rem;
+    padding:.65rem .8rem; border-radius:10px; border-left:3px solid transparent;
+  }
+  .side nav a:hover{background:var(--ink-2); color:#fff}
+  .side nav a.active{background:var(--ink-2); color:#fff; border-left-color:var(--saffron)}
+  .logout{margin-top:auto} .logout button{width:100%; background:var(--ink-2)} .logout button:hover{background:#245a52}
+  /* ---------- main ---------- */
+  main{flex:1; min-width:0; padding:2rem 2.4rem 3rem; max-width:1200px}
+  h2{font-size:1.7rem; font-weight:800; letter-spacing:-.02em; color:var(--ink); margin:0 0 1.2rem}
+  h3{font-size:1.02rem; font-weight:700; color:var(--ink); margin:1.8rem 0 .7rem}
+  a{color:var(--info); font-weight:600}
+  p{margin:.4rem 0 1rem}
+  hr{display:none}
+
+  /* flash messages */
+  .msg{
+    background:var(--info-bg); color:#1d4264; border-radius:10px;
+    padding:.75rem 1rem; margin:0 0 1rem; font-weight:600; font-size:.93rem;
+    border-left:4px solid var(--info);
+  }
+
+  /* ---------- forms ---------- */
+  form:not(.inline){
+    display:flex; flex-wrap:wrap; gap:.55rem; align-items:center;
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:1rem 1.1rem; margin:0 0 1.1rem;
+  }
+  form.inline{display:inline-flex; gap:.35rem; align-items:center; margin:0}
+  input,select{
+    font:inherit; font-size:.92rem; padding:.55rem .7rem; color:var(--text);
+    background:#fbfcfb; border:1px solid var(--line); border-radius:9px; min-width:0;
+  }
+  form:not(.inline) input:not([type=hidden]),form:not(.inline) select{flex:1 1 150px}
+  input:focus,select:focus{outline:none; border-color:var(--saffron); box-shadow:0 0 0 3px #d98a1f33}
+  button{
+    font:inherit; font-size:.9rem; font-weight:700; cursor:pointer;
+    padding:.55rem 1.05rem; border:0; border-radius:9px;
+    background:var(--saffron); color:#fff; transition:background .15s;
+  }
+  button:hover{background:var(--saffron-d)}
+  button:focus-visible{outline:3px solid #d98a1f66; outline-offset:2px}
+  /* destructive buttons turn red */
+  form[action*="delete"] button, form[action*="/contact/"][action$="/delete"] button{
+    background:var(--bad-bg); color:var(--bad);
+  }
+  form[action*="delete"] button:hover{background:#f5c9c4}
+  /* approve = green */
+  form[action*="approve"] button{background:var(--ok)}
+  form[action*="approve"] button:hover{background:#17623f}
+  /* small buttons inside tables */
+  td button{padding:.35rem .75rem; font-size:.82rem}
+  td input,td select{padding:.35rem .5rem; font-size:.85rem}
+
+  /* ---------- tables ---------- */
+  .tablewrap{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    overflow-x:auto; margin:.6rem 0 1.4rem;
+  }
+  table{border-collapse:collapse; width:100%; margin:0; font-size:.92rem}
+  th{
+    text-align:left; font-weight:700; font-size:.8rem; color:var(--muted);
+    padding:.8rem 1rem; background:#f8faf8; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  td{padding:.75rem 1rem; border-bottom:1px solid #eef1ef; vertical-align:middle; font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:0}
+  tbody tr:hover td{background:#fafcfa}
+
+  /* ---------- status badges (added by script below) ---------- */
+  .badge{display:inline-block; padding:.15rem .65rem; border-radius:999px; font-size:.78rem; font-weight:700}
+  .b-paid,.b-active,.b-success{background:var(--ok-bg); color:var(--ok)}
+  .b-overdue,.b-defaulted,.b-failed{background:var(--bad-bg); color:var(--bad)}
+  .b-pending{background:var(--warn-bg); color:var(--warn)}
+  .b-applied{background:var(--info-bg); color:var(--info)}
+  .b-closed,.b-reversed{background:var(--idle-bg); color:var(--idle)}
+
+  /* ---------- mobile ---------- */
+  @media (max-width:800px){
+    body{flex-direction:column}
+    .side{width:100%; height:auto; position:static; flex-direction:row; align-items:center;
+          justify-content:space-between; padding:.8rem 1rem; gap:1rem}
+    .brand small{display:none}
+    .side nav{flex-direction:row}
+    .side nav a{padding:.45rem .7rem; border-left:0}
+    main{padding:1.2rem 1rem 2rem}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head>
+<body>
+<aside class="side">
+  <div class="brand">Loan Management<small>Borrowers, loans and EMIs</small></div>
+  <nav>
+    <a href="{{ url_for('borrowers') }}" class="{{ 'active' if request.path.startswith('/borrowers') }}">Borrowers</a>
+    <a href="{{ url_for('loans') }}" class="{{ 'active' if request.path.startswith('/loans') or request.path.startswith('/installments') }}">Loans</a>
+    <a href="{{ url_for('reports') }}" class="{{ 'active' if request.path.startswith('/reports') }}">Reports</a>
+  </nav>
+    <form class="inline logout" method="post" action="{{ url_for('logout') }}">
+    <button>Log out ({{ session.get('user') }})</button>
+  </form>
+</aside>
+<main>
 {% for m in get_flashed_messages() %}<div class="msg">{{ m }}</div>{% endfor %}
 {% block body %}{% endblock %}
+</main>
+<script>
+  // wrap tables in a card, and turn status words into coloured badges
+  document.querySelectorAll('table').forEach(t=>{
+    const w=document.createElement('div'); w.className='tablewrap';
+    t.parentNode.insertBefore(w,t); w.appendChild(t);
+  });
+  const known=['PAID','OVERDUE','PENDING','ACTIVE','APPLIED','CLOSED','DEFAULTED','SUCCESS','FAILED','REVERSED'];
+  document.querySelectorAll('td').forEach(td=>{
+    const v=td.textContent.trim();
+    if(known.includes(v)){ td.innerHTML='<span class="badge b-'+v.toLowerCase()+'">'+v+'</span>'; }
+  });
+  // loan detail page: the status inside the <b> tag too
+  document.querySelectorAll('p b').forEach(b=>{
+    const v=b.textContent.trim();
+    if(known.includes(v)){ b.className='badge b-'+v.toLowerCase(); }
+  });
+</script>
 </body></html>

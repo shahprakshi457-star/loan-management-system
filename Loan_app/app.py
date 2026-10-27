@@ -4,17 +4,12 @@ from decimal import Decimal, InvalidOperation
 
 import mysql.connector
 from mysql.connector import Error
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
+from flask import (Flask, render_template, request, redirect, url_for,
+                   flash, abort, session)
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-key")
-
-DB = dict(
-    host=os.environ.get("DB_HOST", "localhost"),
-    user=os.environ.get("DB_USER", "loan_app"),
-    password=os.environ.get("DB_PASSWORD", "star"),
-    database="loan_mang",
-)
 
 @app.template_filter("inr")
 def inr(value):
@@ -31,6 +26,13 @@ def inr(value):
             parts.insert(0, head)
         s = ",".join(parts) + "," + tail
     return ("-" if n < 0 else "") + s
+
+DB = dict(
+    host=os.environ.get("DB_HOST", "localhost"),
+    user=os.environ.get("DB_USER", "loan_app"),
+    password=os.environ.get("DB_PASSWORD", "star"),
+    database="loan_mang",
+)
 
 # ------------------------------------------------------------------ DB helpers
 def connect():
@@ -98,6 +100,52 @@ def borrower_error(f, check_phone=True):
     return None
 
 @app.route("/")
+# ------------------------------------------------------------------ LOGIN
+@app.before_request
+def require_login():
+    """Every page except login/register needs a logged-in user."""
+    if request.endpoint in ("login", "register", "static") or session.get("user"):
+        return
+    return redirect(url_for("login"))
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        u = request.form["username"].strip()
+        p = request.form["password"]
+        rows = query("SELECT password_hash FROM staff_login WHERE username=%s", (u,))
+        if rows and check_password_hash(rows[0]["password_hash"], p):
+            session.clear()
+            session["user"] = u
+            return redirect(url_for("borrowers"))
+        flash("Wrong username or password.")
+    return render_template("auth.html", mode="login")
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        f = request.form
+        u = f["username"].strip()
+        if len(u) < 3:
+            flash("Username must be at least 3 characters.")
+        elif len(f["password"]) < 6:
+            flash("Password must be at least 6 characters.")
+        elif f["password"] != f["confirm"]:
+            flash("Passwords do not match.")
+        else:
+            try:
+                execute("INSERT INTO staff_login (username, password_hash) VALUES (%s,%s)",
+                        (u, generate_password_hash(f["password"])))
+                flash("Account created. Please log in.")
+                return redirect(url_for("login"))
+            except Error as e:
+                flash("That username is already taken." if e.errno == 1062 else friendly(e))
+    return render_template("auth.html", mode="register")
+
+@app.post("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 def home():
     return redirect(url_for("borrowers"))
 

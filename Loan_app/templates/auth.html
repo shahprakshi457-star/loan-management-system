@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ 'Log in' if mode == 'login' else 'Create account' }} – Loan Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#10302c; --ink-2:#1b4640; --paper:#f2f4f2; --line:#dde3df;
+        --text:#1d2b28; --muted:#6a7a76; --saffron:#d98a1f; --saffron-d:#b97213;
+        --info:#2c5f8a; --info-bg:#dfeaf5}
+  *{box-sizing:border-box}
+  body{margin:0; min-height:100vh; display:flex; font-family:'Manrope',system-ui,sans-serif;
+       color:var(--text); background:var(--paper)}
+  .hero{flex:1.1; background:var(--ink); color:#fff; padding:3rem;
+        display:flex; flex-direction:column; justify-content:flex-end}
+  .hero h1{font-size:2.6rem; font-weight:800; letter-spacing:-.03em; line-height:1.1; margin:0 0 .8rem}
+  .hero p{color:#9db8b2; font-size:1.05rem; max-width:26rem; margin:0}
+  .panel{flex:1; display:flex; align-items:center; justify-content:center; padding:2rem}
+  .box{width:100%; max-width:380px}
+  h2{font-size:1.7rem; font-weight:800; letter-spacing:-.02em; color:var(--ink); margin:0 0 .3rem}
+  .sub{color:var(--muted); margin:0 0 1.6rem}
+  label{display:block; font-weight:600; font-size:.88rem; margin:1rem 0 .35rem}
+  input{width:100%; font:inherit; padding:.7rem .85rem; border:1px solid var(--line);
+        border-radius:10px; background:#fff; color:var(--text)}
+  input:focus{outline:none; border-color:var(--saffron); box-shadow:0 0 0 3px #d98a1f33}
+  button{width:100%; margin-top:1.5rem; font:inherit; font-weight:700; cursor:pointer;
+         padding:.8rem; border:0; border-radius:10px; background:var(--saffron); color:#fff}
+  button:hover{background:var(--saffron-d)}
+  .msg{background:var(--info-bg); color:#1d4264; border-left:4px solid var(--info);
+       border-radius:10px; padding:.7rem 1rem; margin-bottom:1rem; font-weight:600; font-size:.92rem}
+  .alt{margin-top:1.4rem; color:var(--muted); font-size:.92rem}
+  .alt a{color:var(--info); font-weight:700}
+  @media (max-width:800px){ body{flex-direction:column} .hero{padding:1.6rem; flex:none}
+    .hero h1{font-size:1.6rem} .hero p{display:none} }
+</style></head>
+<body>
+  <div class="hero">
+    <h1>Loan Management System</h1>
+    <p>Track borrowers, loans, EMI schedules and payments in one place.</p>
+  </div>
+  <div class="panel"><div class="box">
+    <h2>{{ 'Welcome back' if mode == 'login' else 'Create your account' }}</h2>
+    <p class="sub">{{ 'Log in to continue.' if mode == 'login' else 'Choose a username and password.' }}</p>
+
+    {% for m in get_flashed_messages() %}<div class="msg">{{ m }}</div>{% endfor %}
+
+    <form method="post">
+      <label for="username">Username</label>
+      <input id="username" name="username" required autofocus autocomplete="username">
+      <label for="password">Password</label>
+      <input id="password" type="password" name="password" required
+             autocomplete="{{ 'current-password' if mode == 'login' else 'new-password' }}">
+      {% if mode == 'register' %}
+        <label for="confirm">Confirm password</label>
+        <input id="confirm" type="password" name="confirm" required autocomplete="new-password">
+      {% endif %}
+      <button>{{ 'Log in' if mode == 'login' else 'Create account' }}</button>
+    </form>
+
+    <p class="alt">
+      {% if mode == 'login' %}New here? <a href="{{ url_for('register') }}">Create an account</a>
+      {% else %}Already have an account? <a href="{{ url_for('login') }}">Log in</a>{% endif %}
+    </p>
+  </div></div>
+</body></html>

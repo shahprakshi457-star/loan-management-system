@@ -138,5 +138,11 @@ CREATE TABLE installment_payment (
   FOREIGN KEY (installment_id) REFERENCES installment(installment_id)
 );
 
+CREATE TABLE staff_login(
+  username      VARCHAR(40)  PRIMARY KEY,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX idx_installment_due ON installment(due_date);
 CREATE INDEX idx_loan_status ON loan(status);
