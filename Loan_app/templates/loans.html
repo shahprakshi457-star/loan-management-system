@@ -1,5 +1,6 @@
 {% extends "base.html" %}{% block body %}
 <h2>Loans</h2>
+
 <h3>Loan limits</h3>
 <table style="width:auto">
   <tr><th>Product</th><th>Principal</th><th>Tenure</th></tr>
@@ -9,6 +10,7 @@
     <td>{{ p.min_tenure_months }} – {{ p.max_tenure_months }} months</td>
   </tr>{% endfor %}
 </table>
+
 <h3>New loan application</h3>
 <form method="post">
   <select name="borrower_id">{% for b in borrowers %}
@@ -18,13 +20,14 @@
   <select name="branch_id">{% for br in branches %}
     <option value="{{ br.branch_id }}">{{ br.name }}</option>{% endfor %}</select>
   <select name="product_id">{% for p in products %}
-    <option value="{{ p.product_id }}">{{ p.name }}</option>{% endfor %}</select>
+    <option value="{{ p.product_id }}">{{ p.name }} (₹{{ p.min_amt|inr }} – ₹{{ p.max_amt|inr }}, {{ p.min_tenure_months }}–{{ p.max_tenure_months }} months)</option>{% endfor %}</select>
   <input name="principal" placeholder="Principal" required>
   <input name="rate" placeholder="Annual rate %" required>
   <input name="tenure" placeholder="Months" required>
   <input type="date" name="start_date" required>
   <button>Apply</button>
 </form>
+
 <table>
   <tr><th>ID</th><th>Borrower</th><th>Officer</th><th>Branch</th><th>Product</th>
       <th>Principal</th><th>Rate</th><th>Months</th><th>Status</th><th></th></tr>
