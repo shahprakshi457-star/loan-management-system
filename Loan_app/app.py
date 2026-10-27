@@ -27,6 +27,7 @@ def inr(value):
         s = ",".join(parts) + "," + tail
     return ("-" if n < 0 else "") + s
 
+
 DB = dict(
     host=os.environ.get("DB_HOST", "localhost"),
     user=os.environ.get("DB_USER", "loan_app"),
@@ -99,7 +100,6 @@ def borrower_error(f, check_phone=True):
         return "Phone must be exactly 10 digits."
     return None
 
-@app.route("/")
 # ------------------------------------------------------------------ LOGIN
 @app.before_request
 def require_login():
@@ -146,6 +146,8 @@ def register():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+@app.route("/")
 def home():
     return redirect(url_for("borrowers"))
 
