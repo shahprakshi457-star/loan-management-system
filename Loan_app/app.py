@@ -1,11 +1,12 @@
 import os
+import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
 import mysql.connector
 from mysql.connector import Error
-from flask import (Flask, render_template, request, redirect, url_for,
-                   flash, abort, session)
+from flask import (Flask, render_template, render_template_string, request,
+                   redirect, url_for, flash, abort, session)
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -27,6 +28,11 @@ def inr(value):
         s = ",".join(parts) + "," + tail
     return ("-" if n < 0 else "") + s
 
+def money(value):
+    """Rupees with paise, Indian grouping: 888488.5 -> ₹8,88,488.50"""
+    v = Decimal(value).quantize(Decimal("0.01"))
+    return "₹" + inr(int(v)) + "." + f"{abs(v) % 1:.2f}"[2:]
+
 
 DB = dict(
     host=os.environ.get("DB_HOST", "localhost"),
@@ -34,6 +40,13 @@ DB = dict(
     password=os.environ.get("DB_PASSWORD", "star"),
     database="loan_mang",
 )
+
+# Limits that mirror the column sizes in tables.sql, so we can reject bad input
+# with a clear message instead of letting MySQL do it.
+MAX_NAME, MAX_ADDRESS, MAX_EMAIL, MAX_USERNAME, MAX_REF = 100, 150, 100, 40, 60
+MAX_RATE = Decimal("999.999")                 # annual_rate_pct is DECIMAL(6,3)
+PHONE_RE = re.compile(r"[0-9]{10}")
+EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 
 # ------------------------------------------------------------------ DB helpers
 def connect():
@@ -74,31 +87,185 @@ def run_tx(statements):
     finally:
         conn.close()
 
-def friendly(e):
-    """Turn MySQL errors into readable messages."""
-    if e.errno == 1452:
-        return ("Not allowed: the officer must work at the branch, the branch must offer "
-                "the product, and the officer must be certified for the product.")
-    if e.errno == 1451:
-        return "Cannot delete: other records depend on this one."
-    if e.errno == 1062:
-        return "That value already exists."
-    if e.errno == 3819:
-        return "A value breaks a rule (for example, amounts must be positive)."
-    return e.msg          # includes messages raised by our triggers/procedures
+# ------------------------------------------------------------------ error messages
+COLUMN_LABELS = {
+    "full_name": "Name", "dob": "Date of birth", "line1": "Address",
+    "email": "Email", "phone": "Phone number", "username": "Username",
+    "p_ref": "Payment reference", "bank_reference": "Payment reference",
+    "p_amount": "Amount", "amount": "Amount", "mode": "Payment mode",
+    "principal": "Principal", "annual_rate_pct": "Interest rate",
+    "tenure_months": "Tenure", "start_date": "Start date",
+}
 
+def _grab(pattern, text):
+    m = re.search(pattern, text)
+    return m.group(1) if m else ""
+
+def friendly(e):
+    """Turn a MySQL error into a message a normal user can act on.
+
+    The raw MySQL text is only written to the terminal, never shown on the page.
+    """
+    msg = e.msg or str(e)
+    low = msg.lower()
+    n = e.errno
+
+    # Messages we wrote ourselves with SIGNAL in the triggers / procedures
+    if n == 1644:
+        return msg
+
+    # Foreign key failed while inserting (child row) -> say WHICH rule failed
+    if n == 1452 or "cannot add or update a child row" in low:
+        target = _grab(r"REFERENCES\s+`(?:[^`]+`\.`)?([^`]+)`", msg)
+        return {
+            "officer_branch":  "This officer is not assigned to the selected branch.",
+            "branch_product":  "The selected branch does not offer this loan product.",
+            "officer_product": "This officer is not authorised to handle this loan product.",
+            "borrower":        "That borrower no longer exists. Refresh the page and try again.",
+            "postal_area":     "That pincode is not in the system. Pick one from the list.",
+        }.get(target, "One of the selected items no longer exists. Refresh the page and try again.")
+
+    # Foreign key failed while deleting (parent row)
+    if n == 1451 or "cannot delete or update a parent row" in low:
+        return "This record can't be deleted because other records depend on it."
+
+    # Duplicates
+    if n == 1062 or "duplicate entry" in low:
+        key = _grab(r"for key '([^']+)'", msg).lower()
+        if "phone" in key:
+            return ("This borrower already has that phone number." if key.endswith("primary")
+                    else "That phone number is already registered to another borrower.")
+        if "email" in key:
+            return ("This borrower already has that email address." if key.endswith("primary")
+                    else "That email address is already registered to another borrower.")
+        if key.endswith("mode"):
+            return "That payment reference has already been used. Enter a different one."
+        if "staff_login" in key:
+            return "That username is already taken."
+        return "That value already exists."
+
+    # Text too long / numbers out of range / bad values
+    if n == 1406 or "data too long" in low:
+        label = COLUMN_LABELS.get(_grab(r"column '([^']+)'", msg), "One of the fields")
+        return f"{label} is too long."
+    if n in (1264, 1265, 1292, 1366, 1690) or "out of range" in low:
+        label = COLUMN_LABELS.get(_grab(r"column '([^']+)'", msg), "One of the values")
+        return f"{label} is invalid or outside the allowed range."
+    if n == 3819 or "check constraint" in low:
+        return "A value is outside the allowed range (amounts, rates and tenure must be above zero)."
+
+    # Setup / connection problems
+    if n in (2002, 2003, 2013, 2055):
+        return "Can't reach the database. Make sure the MySQL service is running."
+    if n == 1045:
+        return "Database login failed. Check the DB_USER and DB_PASSWORD settings."
+    if n == 1049:
+        return f"Database '{DB['database']}' was not found. Run tables.sql first."
+    if n in (1146, 1305):
+        return "A required table or procedure is missing. Re-run the SQL scripts."
+
+    app.logger.error("Unhandled database error %s: %s", n, msg)
+    return "Something went wrong while saving. Please check your input and try again."
+
+@app.errorhandler(Error)
+def database_error(e):
+    """Safety net: any database error nobody caught shows a friendly page, not a traceback."""
+    flash(friendly(e))
+    return render_template_string(
+        "{% extends 'base.html' %}{% block body %}"
+        "<h2>Database problem</h2><p>That page could not be loaded.</p>"
+        "<p><a href=\"{{ url_for('borrowers') }}\">Back to Borrowers</a></p>"
+        "{% endblock %}"), 500
+
+# ------------------------------------------------------------------ input checks
 def borrower_error(f, check_phone=True):
-    if not f["full_name"].strip():
+    name = f["full_name"].strip()
+    if not name:
         return "Name is required."
+    if len(name) > MAX_NAME:
+        return f"Name must be {MAX_NAME} characters or fewer."
     try:
         dob = date.fromisoformat(f["dob"])
     except ValueError:
         return "Enter a valid date of birth."
+    if dob.year < 1900 or dob > date.today():
+        return "Enter a valid date of birth."
     if (date.today() - dob).days < 18 * 365:
         return "Borrower must be at least 18 years old."
-    if check_phone and not (f["phone"].isdigit() and len(f["phone"]) == 10):
+    if check_phone and not PHONE_RE.fullmatch(f["phone"].strip()):
         return "Phone must be exactly 10 digits."
+    email = f.get("email", "").strip()
+    if len(email) > MAX_EMAIL:
+        return f"Email must be {MAX_EMAIL} characters or fewer."
+    if email and not EMAIL_RE.fullmatch(email):
+        return "Enter a valid email address."
+    line1 = f["line1"].strip()
+    if not line1:
+        return "Address is required."
+    if len(line1) > MAX_ADDRESS:
+        return f"Address must be {MAX_ADDRESS} characters or fewer."
     return None
+
+def loan_problems(f, principal, rate, tenure):
+    """Every reason this application would be rejected, in plain words.
+
+    An empty list means it is fine to insert. The trigger and the foreign keys in
+    MySQL still enforce the same rules; this just explains them properly first.
+    """
+    if not (principal.is_finite() and rate.is_finite()):
+        return ["Principal and interest rate must be ordinary numbers."]
+    if principal <= 0 or rate <= 0 or tenure <= 0:
+        return ["Principal, interest rate and tenure must all be greater than zero."]
+    if rate > MAX_RATE:
+        return [f"Annual interest rate cannot be more than {MAX_RATE}%."]
+
+    problems = []
+    oid, brid, pid = f["officer_id"], f["branch_id"], f["product_id"]
+
+    if not query("SELECT 1 FROM borrower WHERE borrower_id=%s", (f["borrower_id"],)):
+        problems.append("The selected borrower no longer exists. Refresh the page and try again.")
+
+    info = query("""SELECT o.name AS officer, b.name AS branch, p.*
+                    FROM officer o, branch b, loan_product p
+                    WHERE o.officer_id=%s AND b.branch_id=%s AND p.product_id=%s""",
+                 (oid, brid, pid))
+    if not info:
+        problems.append("The selected officer, branch or product no longer exists. "
+                        "Refresh the page and try again.")
+        return problems
+    i = info[0]
+
+    # 1. product limits (same rule as the trg_loan_limits trigger)
+    if not (i["min_amt"] <= principal <= i["max_amt"]):
+        problems.append(f"{i['name']} principal must be between "
+                        f"₹{inr(i['min_amt'])} and ₹{inr(i['max_amt'])}.")
+    if not (i["min_tenure_months"] <= tenure <= i["max_tenure_months"]):
+        problems.append(f"{i['name']} tenure must be between "
+                        f"{i['min_tenure_months']} and {i['max_tenure_months']} months.")
+
+    # 2. officer / branch / product rule (same as the three composite foreign keys)
+    combo = []
+    if not query("SELECT 1 FROM officer_branch WHERE officer_id=%s AND branch_id=%s", (oid, brid)):
+        combo.append(f"{i['officer']} is not assigned to {i['branch']}.")
+    if not query("SELECT 1 FROM branch_product WHERE branch_id=%s AND product_id=%s", (brid, pid)):
+        combo.append(f"{i['branch']} does not offer {i['name']}.")
+    if not query("SELECT 1 FROM officer_product WHERE officer_id=%s AND product_id=%s", (oid, pid)):
+        combo.append(f"{i['officer']} is not authorised to handle {i['name']}.")
+    if combo:
+        problems.extend(combo)
+        ok = query("""SELECT o.name AS officer, br.name AS branch
+                      FROM officer_branch ob
+                      JOIN branch_product bp  ON bp.branch_id = ob.branch_id AND bp.product_id = %s
+                      JOIN officer_product op ON op.officer_id = ob.officer_id AND op.product_id = %s
+                      JOIN officer o  ON o.officer_id = ob.officer_id
+                      JOIN branch br  ON br.branch_id = ob.branch_id
+                      ORDER BY o.name, br.name""", (pid, pid))
+        if ok:
+            options = "; ".join(f"{r['officer']} at {r['branch']}" for r in ok)
+            problems.append(f"For {i['name']} you can choose: {options}.")
+        else:
+            problems.append(f"No officer and branch are currently set up for {i['name']}.")
+    return problems
 
 # ------------------------------------------------------------------ LOGIN
 @app.before_request
@@ -128,6 +295,8 @@ def register():
         u = f["username"].strip()
         if len(u) < 3:
             flash("Username must be at least 3 characters.")
+        elif len(u) > MAX_USERNAME:
+            flash(f"Username must be {MAX_USERNAME} characters or fewer.")
         elif len(f["password"]) < 6:
             flash("Password must be at least 6 characters.")
         elif f["password"] != f["confirm"]:
@@ -139,7 +308,7 @@ def register():
                 flash("Account created. Please log in.")
                 return redirect(url_for("login"))
             except Error as e:
-                flash("That username is already taken." if e.errno == 1062 else friendly(e))
+                flash(friendly(e))
     return render_template("auth.html", mode="register")
 
 @app.post("/logout")
@@ -167,12 +336,12 @@ def borrowers():
                         (f["full_name"].strip(), f["dob"]))
             bid = cur.lastrowid
             cur.execute("INSERT INTO borrower_phone (borrower_id, phone) VALUES (%s,%s)",
-                        (bid, f["phone"]))
+                        (bid, f["phone"].strip()))
             if f["email"].strip():
                 cur.execute("INSERT INTO borrower_email (borrower_id, email) VALUES (%s,%s)",
                             (bid, f["email"].strip()))
             cur.execute("INSERT INTO borrower_address (borrower_id, line1, pincode) "
-                        "VALUES (%s,%s,%s)", (bid, f["line1"], f["pincode"]))
+                        "VALUES (%s,%s,%s)", (bid, f["line1"].strip(), f["pincode"]))
             conn.commit()
             flash(f"Borrower added (ID {bid}).")
         except Error as e:
@@ -212,7 +381,7 @@ def edit_borrower(bid):
                 ("UPDATE borrower SET full_name=%s, dob=%s WHERE borrower_id=%s",
                  (f["full_name"].strip(), f["dob"], bid)),
                 ("UPDATE borrower_address SET line1=%s, pincode=%s WHERE borrower_id=%s",
-                 (f["line1"], f["pincode"], bid)),
+                 (f["line1"].strip(), f["pincode"], bid)),
             ])
             flash("Borrower updated.")
         except Error as e:
@@ -238,9 +407,11 @@ def contact_add(bid, kind):
         abort(404)
     table, col = CONTACT[kind]                         # whitelisted, so safe in the f-string
     value = request.form["value"].strip()
-    if kind == "phone" and not (value.isdigit() and len(value) == 10):
+    if kind == "phone" and not PHONE_RE.fullmatch(value):
         flash("Phone must be exactly 10 digits.")
-    elif kind == "email" and "@" not in value:
+    elif kind == "email" and len(value) > MAX_EMAIL:
+        flash(f"Email must be {MAX_EMAIL} characters or fewer.")
+    elif kind == "email" and not EMAIL_RE.fullmatch(value):
         flash("Enter a valid email address.")
     else:
         try:
@@ -260,9 +431,12 @@ def contact_delete(bid, kind):
         if n <= 1:
             flash("A borrower must keep at least one phone number.")
             return redirect(url_for("edit_borrower", bid=bid))
-    execute(f"DELETE FROM {table} WHERE borrower_id=%s AND {col}=%s",
-            (bid, request.form["value"]))
-    flash(f"{kind.capitalize()} removed.")
+    try:
+        execute(f"DELETE FROM {table} WHERE borrower_id=%s AND {col}=%s",
+                (bid, request.form["value"]))
+        flash(f"{kind.capitalize()} removed.")
+    except Error as e:
+        flash(friendly(e))
     return redirect(url_for("edit_borrower", bid=bid))
 
 @app.post("/borrowers/<int:bid>/delete")               # DELETE
@@ -271,7 +445,10 @@ def delete_borrower(bid):
         execute("DELETE FROM borrower WHERE borrower_id=%s", (bid,))
         flash("Borrower deleted.")
     except Error as e:
-        flash("Cannot delete: this borrower has loans." if e.errno == 1451 else friendly(e))
+        if e.errno == 1451 or "parent row" in (e.msg or "").lower():
+            flash("Cannot delete: this borrower has loans.")
+        else:
+            flash(friendly(e))
     return redirect(url_for("borrowers"))
 
 # ------------------------------------------------------------------ LOANS
@@ -288,16 +465,24 @@ LOAN_SELECT = """
 def loans():
     if request.method == "POST":
         f = request.form
-        try:
-            principal = Decimal(f["principal"])
-            rate = Decimal(f["rate"])
-            tenure = int(f["tenure"])
-            date.fromisoformat(f["start_date"])
-            if principal <= 0 or rate <= 0 or tenure <= 0:
-                raise ValueError
-        except (InvalidOperation, ValueError):
-            flash("Principal, rate and tenure must be positive numbers, and the date valid.")
+        if not all(f.get(k) for k in ("borrower_id", "officer_id", "branch_id", "product_id")):
+            flash("Choose a borrower, officer, branch and loan product.")
             return redirect(url_for("loans"))
+        try:
+            principal = Decimal(f["principal"].strip())
+            rate = Decimal(f["rate"].strip())
+            tenure = int(f["tenure"].strip())
+            date.fromisoformat(f["start_date"])
+        except (InvalidOperation, ValueError):
+            flash("Enter valid numbers for principal, rate and tenure, and a valid start date.")
+            return redirect(url_for("loans"))
+
+        problems = loan_problems(f, principal, rate, tenure)
+        if problems:
+            for p in problems:
+                flash(p)
+            return redirect(url_for("loans"))
+
         try:
             execute("""INSERT INTO loan (borrower_id, officer_id, branch_id, product_id,
                          principal, annual_rate_pct, tenure_months, start_date)
@@ -348,24 +533,52 @@ def loan_detail(lid):
 @app.post("/installments/<int:iid>/pay")
 def pay(iid):
     lid = request.form["loan_id"]
+    back = redirect(url_for("loan_detail", lid=lid))
+
     try:
-        amount = Decimal(request.form["amount"])
+        amount = Decimal(request.form["amount"].strip()).quantize(Decimal("0.01"))
     except InvalidOperation:
-        flash("Enter a valid amount.")
-        return redirect(url_for("loan_detail", lid=lid))
+        flash("Enter a valid payment amount.")
+        return back
+    if not amount.is_finite() or amount <= 0:
+        flash("Payment amount must be greater than zero.")
+        return back
+
+    ref = (request.form.get("ref") or "").strip() or None
+    if ref and len(ref) > MAX_REF:
+        flash(f"Payment reference must be {MAX_REF} characters or fewer.")
+        return back
+
+    # Same checks record_payment() makes, but with the actual figures in the message
+    row = query("""SELECT v.status, v.total_due - v.total_paid AS remaining, l.status AS loan_status
+                   FROM v_installment_status v JOIN loan l ON l.loan_id = v.loan_id
+                   WHERE v.installment_id = %s""", (iid,))
+    if not row:
+        flash("That installment no longer exists.")
+        return back
+    r = row[0]
+    if r["loan_status"] != "ACTIVE":
+        flash("Payments can only be recorded on active loans.")
+        return back
+    if r["status"] == "PAID":
+        flash("This installment is already fully paid.")
+        return back
+    if amount > r["remaining"]:
+        flash(f"Amount is more than the {money(r['remaining'])} still due on this installment.")
+        return back
+
     conn = connect()
     try:                       # stored procedure does the validation + allocation
         cur = conn.cursor()
-        cur.callproc("record_payment",
-                     (iid, amount, request.form["mode"], request.form.get("ref") or None))
+        cur.callproc("record_payment", (iid, amount, request.form["mode"], ref))
         conn.commit()
-        flash("Payment recorded.")
+        flash(f"Payment of {money(amount)} recorded.")
     except Error as e:
         conn.rollback()
         flash(friendly(e))
     finally:
         conn.close()
-    return redirect(url_for("loan_detail", lid=lid))
+    return back
 
 # ------------------------------------------------------------------ REPORTS
 @app.route("/reports")
